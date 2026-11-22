@@ -1,0 +1,444 @@
+<title>CasaN 外構工程ボード</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Klee+One:wght@400;600&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<style>
+/* Layout: 壁掛けホワイトボード。上に見出しと集計、中央に「現場 × 日付」の工程グリッド、下に連絡事項の書き込み欄 */
+:root{
+  --board:#f6f8f7; --panel:#ffffff; --frame:#b8bfc6; --ink:#1c2632; --muted:#65707c;
+  --line:#dde2e5; --weekend:#eceff1; --today:#fff3c4;
+  --blue:#1f5fbf; --green:#1c8757; --red:#cf3a2e; --orange:#cf7a22; --grey:#97a0aa;
+  --blue-soft:#e3ecfa; --orange-soft:#fbefe1;
+  --f-marker:"Klee One","Hiragino Maru Gothic ProN","Yu Gothic",sans-serif;
+  --f-body:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",sans-serif;
+  --left:340px; --rowh:52px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --board:#171c21; --panel:#1e242a; --frame:#3b444d; --ink:#e7ecef; --muted:#97a2ad;
+  --line:#2b333b; --weekend:#1c2227; --today:#3a3419;
+  --blue:#6b9cf0; --green:#4fc28a; --red:#f07468; --orange:#eea35a; --grey:#6d7782;
+  --blue-soft:#1f2c42; --orange-soft:#3a2c1c; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --board:#171c21; --panel:#1e242a; --frame:#3b444d; --ink:#e7ecef; --muted:#97a2ad;
+  --line:#2b333b; --weekend:#1c2227; --today:#3a3419;
+  --blue:#6b9cf0; --green:#4fc28a; --red:#f07468; --orange:#eea35a; --grey:#6d7782;
+  --blue-soft:#1f2c42; --orange-soft:#3a2c1c; color-scheme:dark}
+html,body{height:100%}
+[hidden]{display:none!important}
+body{background:var(--board);color:var(--ink);font-family:var(--f-body);font-size:15px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:16px;box-sizing:border-box;display:flex;flex-direction:column;gap:14px}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+
+header{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 24px}
+.ttl{display:flex;flex-direction:column;gap:2px;min-width:0}
+.ttl small{font-size:12px;letter-spacing:.12em;color:var(--muted)}
+.ttl h1{margin:0;font-family:var(--f-marker);font-weight:600;font-size:30px;line-height:1.15;text-wrap:balance}
+.clock{font-family:var(--f-marker);font-size:20px;color:var(--muted)}
+.stats{display:flex;flex-wrap:wrap;gap:8px 22px;margin-left:auto}
+.stat{display:flex;flex-direction:column}
+.stat b{font-family:var(--f-marker);font-weight:600;font-size:26px;line-height:1.1}
+.stat span{font-size:12px;color:var(--muted);letter-spacing:.06em}
+.stat.alert b{color:var(--red)}
+
+.tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn{border:1.5px solid var(--line);background:var(--panel);border-radius:8px;padding:6px 12px;line-height:1.3}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:700}
+.seg{display:inline-flex;border:1.5px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel)}
+.seg button{border:0;background:none;padding:6px 11px}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--board)}
+.chk{display:inline-flex;gap:6px;align-items:center;font-size:14px;color:var(--muted)}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:13px;color:var(--muted);margin-left:auto}
+.legend i{display:inline-block;width:22px;height:10px;border-radius:3px;vertical-align:middle;margin-right:5px}
+.note{font-size:13px;color:var(--muted)}
+.note.warn{color:var(--red)}
+
+.frame{flex:1 1 auto;min-height:0;border:1.5px solid var(--frame);border-radius:10px;background:var(--panel);overflow:auto;position:relative}
+.grid{position:relative;min-width:calc(var(--left) + var(--days) * var(--dayw,26px))}
+.row{display:grid;grid-template-columns:var(--left) 1fr;border-bottom:1px solid var(--line);min-height:var(--rowh)}
+.row.head{position:sticky;top:0;z-index:3;background:var(--panel);min-height:0}
+.cellL{position:sticky;left:0;z-index:2;background:var(--panel);border-right:1.5px solid var(--frame);padding:6px 12px;display:flex;flex-direction:column;justify-content:center;gap:2px;min-width:0}
+.head .cellL{z-index:4;justify-content:flex-end;font-size:12px;color:var(--muted);letter-spacing:.08em}
+.days{display:grid;grid-template-columns:repeat(var(--days),1fr);position:relative}
+.dh{text-align:center;font-size:12px;padding:3px 0 5px;border-left:1px solid var(--line);line-height:1.25}
+.dh b{display:block;font-size:15px;font-weight:700}
+.dh.sat{color:var(--blue)} .dh.sun{color:var(--red)}
+.dh.today{background:var(--today);font-weight:700}
+.mon{grid-column:span 1;overflow:hidden!important;font-family:var(--f-marker);font-weight:600;font-size:15px;padding:4px 6px 0;white-space:nowrap;overflow:visible}
+.bg{position:absolute;top:0;bottom:0;left:var(--left);right:0;display:grid;grid-template-columns:repeat(var(--days),1fr);pointer-events:none;z-index:0}
+.bg div{border-left:1px solid var(--line)}
+.bg .we{background:var(--weekend)}
+.y .bg div{border-left:0}
+.bg .ms{border-left:1px solid var(--frame)!important}
+.y .dh{display:none}
+.mon.ms{border-left:1px solid var(--frame)}
+.wk{font-size:11px;color:var(--muted);padding:2px 0 4px 3px;border-left:1px solid var(--line);white-space:nowrap;overflow:hidden}
+.bg .td{background:var(--today);position:relative}
+.bg .td::after{content:"";position:absolute;top:0;bottom:0;left:50%;width:2px;background:var(--red);opacity:.7}
+.row.job{cursor:pointer;position:relative;z-index:1}
+.row.job:hover .cellL{background:var(--board)}
+.ro .row.job{cursor:default}
+.site{font-weight:700;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.meta{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.meta .amt{color:var(--ink);font-weight:500}
+.lane{display:grid;grid-template-columns:repeat(var(--days),1fr);align-items:center;padding:8px 0;position:relative}
+.bar{height:30px;border-radius:7px;display:flex;align-items:center;padding:0 8px;font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;box-sizing:border-box;margin:0 2px}
+.bar.s-before{background:var(--blue-soft);border:2px solid var(--blue);color:var(--blue)}
+.bar.s-doing{background:var(--green);border:2px solid var(--green);color:#fff}
+.bar.s-hold{background:var(--orange-soft);border:2px dashed var(--orange);color:var(--orange)}
+.bar.s-done{background:transparent;border:2px solid var(--grey);color:var(--grey)}
+.bar.late{box-shadow:0 0 0 2px var(--red) inset}
+.bar.cutL{border-top-left-radius:0;border-bottom-left-radius:0;margin-left:0}
+.bar.cutR{border-top-right-radius:0;border-bottom-right-radius:0;margin-right:0}
+.tbd{grid-column:1 / -1;font-size:13px;color:var(--muted);padding-left:10px;font-family:var(--f-marker)}
+.tag{display:inline-block;font-size:11px;font-weight:700;padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:2px}
+.tag.late{background:var(--red);color:#fff}
+.tag.hold{border:1px solid var(--orange);color:var(--orange)}
+.empty{padding:28px 20px;background:var(--panel);width:fit-content;max-width:100%;box-sizing:border-box;display:flex;flex-direction:column;gap:10px;align-items:flex-start;position:relative;z-index:1}
+.empty h2{margin:0;font-family:var(--f-marker);font-weight:600;font-size:22px}
+.empty p{margin:0;color:var(--muted);max-width:60ch;line-height:1.7}
+
+.memo{border:1.5px solid var(--frame);border-radius:10px;background:var(--panel);padding:10px 14px;display:flex;flex-direction:column;gap:4px}
+.memo label{font-family:var(--f-marker);font-weight:600;font-size:16px}
+.memo label span{font-family:var(--f-body);font-weight:400;font-size:12px;color:var(--muted);margin-left:8px}
+.memo textarea{border:0;background:transparent;resize:vertical;min-height:52px;font-family:var(--f-marker);font-size:18px;line-height:1.6;outline-offset:4px}
+
+/* 編集パネル */
+.ov{position:fixed;inset:0;background:rgba(10,15,20,.45);display:flex;align-items:center;justify-content:center;z-index:20;padding:16px}
+.dlg{background:var(--panel);border-radius:12px;border:1.5px solid var(--frame);width:min(620px,100%);max-height:100%;overflow:auto;padding:18px 20px;display:flex;flex-direction:column;gap:14px;box-sizing:border-box}
+.dlg h2{margin:0;font-family:var(--f-marker);font-weight:600;font-size:22px}
+.fields{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px}
+.fields .wide{grid-column:1 / -1}
+.f{display:flex;flex-direction:column;gap:4px;min-width:0}
+.f span{font-size:12px;color:var(--muted);letter-spacing:.05em}
+.f input,.f select,.f textarea{border:1.5px solid var(--line);border-radius:7px;padding:7px 9px;background:var(--board);min-width:0}
+.acts{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;align-items:center}
+.acts .del{margin-right:auto;color:var(--red);border-color:transparent;background:none}
+.acts .del.armed{background:var(--red);color:#fff;border-color:var(--red)}
+.err{color:var(--red);font-size:13px}
+
+/* 壁掛け表示（全画面） */
+body.tv{font-size:17px;padding-block:20px}
+body.tv .edit-only{display:none!important}
+body.tv{--left:420px;--rowh:62px}
+body.tv .ttl h1{font-size:40px}
+body.tv .stat b{font-size:34px}
+body.tv .clock{font-size:26px}
+body.tv .site{font-size:20px}
+body.tv .meta{font-size:15px}
+body.tv .bar{height:36px;font-size:15px}
+body.tv .dh b{font-size:17px}
+body.tv .memo textarea{font-size:22px}
+body.tv .frame{overflow:hidden}
+.ro .edit-only{display:none!important}
+
+@media (max-width:640px){
+  :root{--left:170px}
+  .ttl h1{font-size:24px}
+  .stats{margin-left:0}
+  .legend{margin-left:0}
+  .fields{grid-template-columns:1fr}
+  .frame{min-height:60vh}
+}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+</style>
+
+<header>
+  <div class="ttl">
+    <small>株式会社CasaN　外構工事</small>
+    <h1>受注残 工程表</h1>
+    <div class="clock num" id="clock"></div>
+  </div>
+  <div class="stats" id="stats"></div>
+</header>
+
+<div class="tools">
+  <button class="btn primary edit-only" id="addBtn" type="button">＋ 現場を追加</button>
+  <div class="seg" role="group" aria-label="表示期間">
+    <button type="button" data-w="4w">4週間</button>
+    <button type="button" data-w="3m">3ヶ月</button>
+    <button type="button" data-w="1y">1年</button>
+  </div>
+  <div class="seg" role="group" aria-label="期間移動">
+    <button type="button" id="prev" aria-label="前へ">◀</button>
+    <button type="button" id="today">今日から</button>
+    <button type="button" id="next" aria-label="次へ">▶</button>
+  </div>
+  <label class="chk"><input type="checkbox" id="showDone"> 完了も表示</label>
+  <button class="btn" id="fsBtn" type="button">壁掛け表示</button>
+  <span class="note" id="status">データを読み込み中…</span>
+  <div class="legend">
+    <span><i style="background:var(--blue-soft);border:2px solid var(--blue)"></i>着工前</span>
+    <span><i style="background:var(--green)"></i>施工中</span>
+    <span><i style="background:var(--orange-soft);border:2px dashed var(--orange)"></i>保留</span>
+    <span><i style="box-shadow:0 0 0 2px var(--red) inset;background:var(--blue-soft)"></i>完工予定超過</span>
+  </div>
+</div>
+
+<div class="frame" id="frame"><div class="grid" id="grid"></div></div>
+
+<div class="memo">
+  <label for="memo">連絡事項<span class="edit-only">ここに書くと全員の画面に反映されます</span></label>
+  <textarea id="memo" placeholder="例：〇〇様邸 ブロック搬入は木曜午前／雨天時は翌日順延"></textarea>
+</div>
+
+<div class="ov" id="ov" hidden>
+  <form class="dlg" id="form" autocomplete="off">
+    <h2 id="dlgTitle">現場を追加</h2>
+    <div class="fields">
+      <label class="f wide"><span>邸名</span><input id="f_site" required maxlength="60" placeholder="例：山田様邸"></label>
+      <label class="f wide"><span>工事住所</span><input id="f_addr" maxlength="120" placeholder="例：〇〇市〇〇町1-2-3"></label>
+      <label class="f wide"><span>工事内容</span><input id="f_work" maxlength="80" placeholder="例：カーポート・土間コン・フェンス"></label>
+      <label class="f"><span>担当</span><input id="f_owner" maxlength="20"></label>
+      <label class="f"><span>施工業者</span><input id="f_crew" maxlength="30"></label>
+      <label class="f"><span>工事金額（万円・税込）</span><input id="f_amount" type="number" min="0" step="0.1" inputmode="decimal"></label>
+      <label class="f"><span>契約日</span><input id="f_contract" type="date"></label>
+      <label class="f"><span>着工日</span><input id="f_start" type="date"></label>
+      <label class="f"><span>完工予定日</span><input id="f_end" type="date"></label>
+      <label class="f"><span>状態</span>
+        <select id="f_status">
+          <option value="before">着工前</option>
+          <option value="doing">施工中</option>
+          <option value="hold">保留</option>
+          <option value="done">完了</option>
+        </select></label>
+      <label class="f wide"><span>メモ</span><textarea id="f_note" rows="2" maxlength="300"></textarea></label>
+    </div>
+    <div class="err" id="ferr"></div>
+    <div class="acts">
+      <button type="button" class="btn del" id="delBtn">削除</button>
+      <button type="button" class="btn" id="cancelBtn">閉じる</button>
+      <button type="submit" class="btn primary" id="saveBtn">保存</button>
+    </div>
+  </form>
+</div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const STATUS = {before:"着工前", doing:"施工中", hold:"保留", done:"完了"};
+const WD = ["日","月","火","水","木","金","土"];
+let db = null, jobs = [], loaded = false, canWrite = true, editingId = null;
+let view = {range:"1y", offset:0, showDone:false};
+const RANGE = {"4w":{n:28,w:"26px",step:7}, "3m":{n:91,w:"10px",step:30}, "1y":{n:365,w:"4px",step:91}};
+try { Object.assign(view, JSON.parse(localStorage.getItem("casan-gaiko-view") || "{}")); view.offset = 0; if (!RANGE[view.range]) view.range = "1y"; } catch (e) {}
+const saveView = () => { try { localStorage.setItem("casan-gaiko-view", JSON.stringify({range:view.range, showDone:view.showDone})); } catch (e) {} };
+
+const pad = n => String(n).padStart(2, "0");
+const ymd = d => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+const parse = s => { if (!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return null; const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+const dayDiff = (a, b) => Math.round((b - a) / 86400000);
+const today0 = () => { const t = new Date(); return new Date(t.getFullYear(), t.getMonth(), t.getDate()); };
+const monday = d => { const x = new Date(d); const w = (x.getDay() + 6) % 7; x.setDate(x.getDate() - w); return x; };
+const md = d => (d.getMonth() + 1) + "/" + d.getDate();
+const man = v => (Math.round(v * 10) / 10).toLocaleString("ja-JP");
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+function isLate(j, t) { const e = parse(j.end); return j.status !== "done" && e && e < t; }
+
+function renderStats() {
+  const t = today0(), wS = monday(t), wE = new Date(wS); wE.setDate(wE.getDate() + 6);
+  const open = jobs.filter(j => j.status !== "done");
+  const sum = open.reduce((a, j) => a + (Number(j.amount) || 0), 0);
+  const doing = open.filter(j => j.status === "doing").length;
+  const startWeek = open.filter(j => { const s = parse(j.start); return s && s >= wS && s <= wE; }).length;
+  const late = open.filter(j => isLate(j, t)).length;
+  const tbd = open.filter(j => !j.start).length;
+  $("#stats").innerHTML = [
+    ["受注残", open.length + "件"], ["受注残 金額", man(sum) + "万円"], ["施工中", doing + "件"],
+    ["今週着工", startWeek + "件"], ["日程未定", tbd + "件"], ["完工予定超過", late + "件", late > 0]
+  ].map(([k, v, a]) => `<div class="stat${a ? " alert" : ""}"><b class="num">${v}</b><span>${k}</span></div>`).join("");
+}
+
+function render() {
+  const t = today0();
+  const R = RANGE[view.range];
+  const start = new Date(t); start.setDate(start.getDate() + view.offset * R.step);
+  const N = R.n;
+  const end = new Date(start); end.setDate(end.getDate() + N - 1);
+  const days = Array.from({length: N}, (_, i) => { const d = new Date(start); d.setDate(d.getDate() + i); return d; });
+  const grid = $("#grid");
+  grid.style.setProperty("--days", N); grid.style.setProperty("--dayw", R.w);
+  grid.classList.toggle("y", view.range === "1y");
+  document.querySelectorAll("[data-w]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.w === view.range)));
+  $("#showDone").checked = view.showDone;
+
+  let h = '<div class="bg">' + days.map(d => {
+    const c = ymd(d) === ymd(t) ? "td" : (view.range !== "1y" && (d.getDay() === 0 || d.getDay() === 6) ? "we" : "");
+    return `<div class="${c}${d.getDate() === 1 ? " ms" : ""}"></div>`;
+  }).join("") + "</div>";
+
+  // 見出し：月 + 日付
+  let months = "", i = 0;
+  while (i < N) { const m = days[i].getMonth(); let k = i; while (k < N && days[k].getMonth() === m) k++;
+    const lab = view.range === "1y" ? (m === 0 || i === 0 ? days[i].getFullYear() + "年" : "") + (m + 1) + "月" : days[i].getFullYear() + "年" + (m + 1) + "月";
+    months += `<div class="mon${days[i].getDate() === 1 ? " ms" : ""}" style="grid-column:${i + 1} / ${k + 1}">${k - i >= 18 ? lab : k - i >= 7 ? (m + 1) + "月" : ""}</div>`; i = k; }
+  const dayHead = view.range === "3m" ? days.map((d, x) => d.getDay() === 1 || x === 0 ? `<div class="wk num" style="grid-column:${x + 1} / span 7">${md(d)}</div>` : "").join("") : view.range === "1y" ? "" : days.map(d => {
+    const c = [d.getDay() === 6 ? "sat" : "", d.getDay() === 0 ? "sun" : "", ymd(d) === ymd(t) ? "today" : ""].join(" ");
+    return `<div class="dh ${c}"><b class="num">${d.getDate()}</b>${WD[d.getDay()]}</div>`;
+  }).join("");
+  h += `<div class="row head"><div class="cellL">邸名 ／ 工事住所 ／ 工事内容・金額</div><div><div class="days">${months}</div><div class="days">${dayHead}</div></div></div>`;
+
+  const list = jobs.filter(j => view.showDone || j.status !== "done").slice().sort((a, b) => {
+    const da = a.start || "9999", dbb = b.start || "9999";
+    return da < dbb ? -1 : da > dbb ? 1 : String(a.site).localeCompare(String(b.site), "ja");
+  });
+
+  if (!list.length) {
+    h += `<div class="empty"><h2>${loaded ? (jobs.length ? "表示中の期間に受注残はありません" : "まだ現場が登録されていません") : "読み込み中…"}</h2>
+      <p>${loaded && !jobs.length ? "「＋ 現場を追加」から、受注済みでまだ完工していない外構工事を登録してください。着工日と完工予定日を入れると、この面に工程バーが引かれます。スマホやPCから更新した内容は、壁掛け表示のMac miniにもそのまま反映されます。" : ""}</p>
+      ${loaded && !jobs.length && canWrite ? '<button class="btn primary edit-only" type="button" data-add>＋ 最初の現場を追加</button>' : ""}</div>`;
+  }
+
+  for (const j of list) {
+    const s = parse(j.start), e = parse(j.end) || s, late = isLate(j, t);
+    const metaA = j.addr ? esc(j.addr) : "";
+    const metaB = [j.work && esc(j.work), j.owner && "担当 " + esc(j.owner), j.crew && esc(j.crew), j.amount !== "" && j.amount != null && `<span class="amt num">${man(Number(j.amount))}万円</span>`].filter(Boolean).join("　");
+    let lane = "";
+    if (!s) lane = `<div class="tbd">日程未定${j.contract ? "（契約 " + md(parse(j.contract) || t) + "）" : ""}</div>`;
+    else if (e < start || s > end) lane = `<div class="tbd"${late ? ' style="color:var(--red)"' : ""}>${s > end ? "→ " + md(s) + " 着工予定" : md(s) + "〜" + md(e) + "（期間外）"}</div>`;
+    else {
+      const a = Math.max(0, dayDiff(start, s)), b = Math.min(N - 1, dayDiff(start, e));
+      const cls = ["bar", "s-" + (j.status || "before"), late ? "late" : "", s < start ? "cutL" : "", e > end ? "cutR" : ""].join(" ");
+      lane = `<div class="${cls}" style="grid-column:${a + 1} / ${b + 2}" title="${esc(md(s) + "〜" + md(e))}">${esc(md(s) + "〜" + md(e))}${j.work ? "　" + esc(j.work) : ""}</div>`;
+    }
+    const tags = (late ? '<span class="tag late">遅れ</span>' : "") + (j.status === "hold" ? '<span class="tag hold">保留</span>' : "") + (j.status === "done" ? '<span class="tag hold" style="border-color:var(--grey);color:var(--grey)">完了</span>' : "");
+    h += `<div class="row job" data-id="${esc(j.id)}" ${canWrite ? 'tabindex="0" role="button"' : ""} aria-label="${esc(j.site)}">
+      <div class="cellL"><div class="site">${esc(j.site || "（無題）")}${tags}</div>
+      ${metaA ? `<div class="meta">${metaA}</div>` : ""}${metaB ? `<div class="meta">${metaB}</div>` : ""}</div>
+      <div class="lane">${lane}</div></div>`;
+  }
+  grid.innerHTML = h;
+  renderStats();
+}
+
+function tickClock() {
+  const d = new Date();
+  $("#clock").textContent = `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日（${WD[d.getDay()]}） ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+let lastDay = ymd(new Date());
+setInterval(() => { tickClock(); const n = ymd(new Date()); if (n !== lastDay) { lastDay = n; render(); } }, 20000);
+
+// ---- 編集 ----
+const F = ["site","addr","work","owner","crew","amount","contract","start","end","status","note"];
+function openEditor(id) {
+  if (!canWrite || !db) return;
+  editingId = id || null;
+  const j = id ? jobs.find(x => x.id === id) || {} : {status: "before"};
+  F.forEach(k => { $("#f_" + k).value = j[k] ?? (k === "status" ? "before" : ""); });
+  $("#dlgTitle").textContent = id ? "現場を編集" : "現場を追加";
+  $("#delBtn").hidden = !id; $("#delBtn").classList.remove("armed"); $("#delBtn").textContent = "削除";
+  $("#ferr").textContent = "";
+  $("#ov").hidden = false; setTimeout(() => $("#f_site").focus(), 0);
+}
+const closeEditor = () => { $("#ov").hidden = true; editingId = null; };
+$("#cancelBtn").onclick = closeEditor;
+$("#ov").addEventListener("click", e => { if (e.target.id === "ov") closeEditor(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("#ov").hidden) closeEditor(); });
+
+$("#form").addEventListener("submit", async e => {
+  e.preventDefault();
+  const v = {}; F.forEach(k => v[k] = $("#f_" + k).value.trim());
+  if (!v.site) { $("#ferr").textContent = "現場名を入力してください。"; return; }
+  if (v.start && v.end && v.end < v.start) { $("#ferr").textContent = "完工予定日が着工日より前になっています。"; return; }
+  v.amount = v.amount === "" ? null : Number(v.amount);
+  v.updatedAt = new Date().toISOString();
+  $("#saveBtn").disabled = true;
+  try {
+    if (editingId) await db.collection("jobs").doc(editingId).set(v);
+    else await db.collection("jobs").add(v);
+    closeEditor();
+  } catch (err) {
+    $("#ferr").textContent = err && err.code === "invalid_argument" ? "この画面では編集する権限がありません。" : "保存できませんでした。通信を確認してもう一度お試しください。";
+    if (err && err.code === "invalid_argument") { canWrite = false; document.body.classList.add("ro"); }
+  } finally { $("#saveBtn").disabled = false; }
+});
+$("#delBtn").onclick = async () => {
+  const b = $("#delBtn");
+  if (!b.classList.contains("armed")) { b.classList.add("armed"); b.textContent = "本当に削除する"; return; }
+  try { await db.collection("jobs").doc(editingId).delete(); closeEditor(); }
+  catch (err) { $("#ferr").textContent = "削除できませんでした。"; }
+};
+
+$("#grid").addEventListener("click", e => {
+  if (e.target.closest("[data-add]")) return openEditor();
+  const r = e.target.closest(".row.job"); if (r && !document.body.classList.contains("tv")) openEditor(r.dataset.id);
+});
+$("#grid").addEventListener("keydown", e => {
+  const r = e.target.closest(".row.job"); if (r && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openEditor(r.dataset.id); }
+});
+$("#addBtn").onclick = () => openEditor();
+
+// ---- 表示切替 ----
+document.querySelectorAll("[data-w]").forEach(b => b.onclick = () => { view.range = b.dataset.w; view.offset = 0; saveView(); render(); });
+$("#prev").onclick = () => { view.offset--; render(); };
+$("#next").onclick = () => { view.offset++; render(); };
+$("#today").onclick = () => { view.offset = 0; render(); };
+$("#showDone").onchange = e => { view.showDone = e.target.checked; saveView(); render(); };
+
+// ---- 壁掛け表示：全画面・画面スリープ防止・長いリストは自動スクロール ----
+let wake = null, scrollTimer = null;
+async function keepAwake() { try { if (navigator.wakeLock) wake = await navigator.wakeLock.request("screen"); } catch (e) {} }
+function setTV(on) {
+  document.body.classList.toggle("tv", on);
+  $("#fsBtn").textContent = on ? "壁掛け表示を終了" : "壁掛け表示";
+  clearInterval(scrollTimer);
+  if (on) {
+    view.offset = 0; render(); keepAwake();
+    const fr = $("#frame");
+    scrollTimer = setInterval(() => {
+      if (fr.scrollHeight <= fr.clientHeight + 4) return;
+      const nextTop = fr.scrollTop + fr.clientHeight - 80;
+      fr.scrollTo({top: nextTop >= fr.scrollHeight - fr.clientHeight + 4 ? 0 : nextTop, behavior: "smooth"});
+    }, 15000);
+  } else { try { wake && wake.release(); } catch (e) {} wake = null; $("#frame").scrollTop = 0; }
+}
+$("#fsBtn").onclick = async () => {
+  const on = !document.body.classList.contains("tv");
+  if (on) { try { await document.documentElement.requestFullscreen(); } catch (e) {} setTV(true); }
+  else { try { if (document.fullscreenElement) await document.exitFullscreen(); } catch (e) {} setTV(false); }
+};
+document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement && document.body.classList.contains("tv")) setTV(false); });
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && document.body.classList.contains("tv")) keepAwake(); });
+
+// ---- 連絡事項 ----
+let memoTimer = null, memoBusy = false, memoPending = null;
+async function writeMemo(text) {
+  if (memoBusy) { memoPending = text; return; }
+  memoBusy = true;
+  try { await db.doc("board/memo").set({text, updatedAt: new Date().toISOString()}); } catch (e) { $("#status").textContent = "連絡事項を保存できませんでした"; }
+  memoBusy = false;
+  if (memoPending !== null) { const p = memoPending; memoPending = null; writeMemo(p); }
+}
+$("#memo").addEventListener("input", e => { if (!db || !canWrite) return; clearTimeout(memoTimer); const v = e.target.value; memoTimer = setTimeout(() => writeMemo(v), 1000); });
+
+// ---- データ接続 ----
+tickClock(); render();
+(async () => {
+  try {
+    db = await claude.use("db");
+    const user = await claude.use("user");
+    if (user) { const w = await user.can("data.write"); if (w === false) canWrite = false; }
+  } catch (e) { db = null; }
+  if (!db) { loaded = true; canWrite = false; document.body.classList.add("ro"); $("#memo").readOnly = true;
+    $("#status").textContent = "データに接続できません。claude.ai にサインインして開いてください。"; $("#status").classList.add("warn"); render(); return; }
+  if (!canWrite) { document.body.classList.add("ro"); $("#memo").readOnly = true; }
+  const timer = setTimeout(() => { $("#status").textContent = "データにまだ接続できません。通信を確認してください。"; $("#status").classList.add("warn"); }, 10000);
+  db.collection("jobs").onSnapshot(snap => {
+    jobs = snap.docs.map(d => ({id: d.id, ...d.data()}));
+    if (!snap.metadata.fromCache) { clearTimeout(timer); loaded = true; $("#status").classList.remove("warn");
+      $("#status").textContent = "最終更新 " + pad(new Date().getHours()) + ":" + pad(new Date().getMinutes()); }
+    else if (!loaded) loaded = true;
+    render();
+  }, err => { clearTimeout(timer); loaded = true; $("#status").textContent = "データの受信が止まりました。ページを開き直してください。"; $("#status").classList.add("warn"); render(); });
+  db.doc("board/memo").onSnapshot(s => {
+    const t = s.exists ? (s.data().text || "") : "";
+    if (document.activeElement !== $("#memo")) $("#memo").value = t;
+  }, () => {});
+})();
+})();
+</script>
