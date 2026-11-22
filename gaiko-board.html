@@ -120,6 +120,16 @@ header{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 24px}
 .acts .del{margin-right:auto;color:var(--red);border-color:transparent;background:none}
 .acts .del.armed{background:var(--red);color:#fff;border-color:var(--red)}
 .err{color:var(--red);font-size:13px}
+.row.job .cellL{padding-right:78px}
+.ro .row.job .cellL, body.tv .row.job .cellL{padding-right:12px}
+.doneBtn{position:absolute;right:10px;top:50%;transform:translateY(-50%);border:1.5px solid var(--green);color:var(--green);background:var(--panel);border-radius:7px;padding:5px 10px;font-weight:700;font-size:13px;white-space:nowrap}
+.doneBtn:hover{background:var(--green);color:#fff}
+.doneBtn.armed{background:var(--green);color:#fff}
+.doneBtn.undo{border-color:var(--grey);color:var(--muted)}
+.stat.sales b{color:var(--green)}
+.stats .sep{width:1.5px;background:var(--line);align-self:stretch}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--board);padding:10px 14px;border-radius:9px;display:flex;gap:14px;align-items:center;z-index:30;font-size:14px;max-width:calc(100% - 32px)}
+.toast button{background:none;border:0;color:inherit;text-decoration:underline;font-weight:700}
 
 /* 壁掛け表示（全画面） */
 body.tv{font-size:17px;padding-block:20px}
@@ -248,10 +258,18 @@ function renderStats() {
   const startWeek = open.filter(j => { const s = parse(j.start); return s && s >= wS && s <= wE; }).length;
   const late = open.filter(j => isLate(j, t)).length;
   const tbd = open.filter(j => !j.start).length;
-  $("#stats").innerHTML = [
+  const fyY = t.getMonth() >= 8 ? t.getFullYear() : t.getFullYear() - 1;
+  const fyS = new Date(fyY, 8, 1), fyE = new Date(fyY + 1, 7, 31);
+  const inFY = d => d && d >= fyS && d <= fyE;
+  const sales = jobs.filter(j => j.status === "done" && inFY(parse(j.completedAt) || parse(j.end))).reduce((a, j) => a + (Number(j.amount) || 0), 0);
+  const plan = open.filter(j => inFY(parse(j.end))).reduce((a, j) => a + (Number(j.amount) || 0), 0);
+  const fyLab = fyY + "年度";
+  $("#stats").innerHTML = `<div class="stat sales" title="${fyY}/9/1〜${fyY + 1}/8/31 に完工した現場の合計"><b class="num">${man(sales)}万円</b><span>${fyLab} 売上（完工済）</span></div>
+    <div class="stat" title="完工済＋今年度中に完工予定の受注残"><b class="num">${man(sales + plan)}万円</b><span>${fyLab} 見込み（8月末まで）</span></div><div class="sep"></div>` + [
     ["受注残", open.length + "件"], ["受注残 金額", man(sum) + "万円"], ["施工中", doing + "件"],
     ["今週着工", startWeek + "件"], ["日程未定", tbd + "件"], ["完工予定超過", late + "件", late > 0]
   ].map(([k, v, a]) => `<div class="stat${a ? " alert" : ""}"><b class="num">${v}</b><span>${k}</span></div>`).join("");
+  void fyE;
 }
 
 function render() {
@@ -312,7 +330,8 @@ function render() {
     const tags = (late ? '<span class="tag late">遅れ</span>' : "") + (j.status === "hold" ? '<span class="tag hold">保留</span>' : "") + (j.status === "done" ? '<span class="tag hold" style="border-color:var(--grey);color:var(--grey)">完了</span>' : "");
     h += `<div class="row job" data-id="${esc(j.id)}" ${canWrite ? 'tabindex="0" role="button"' : ""} aria-label="${esc(j.site)}">
       <div class="cellL"><div class="site">${esc(j.site || "（無題）")}${tags}</div>
-      ${metaA ? `<div class="meta">${metaA}</div>` : ""}${metaB ? `<div class="meta">${metaB}</div>` : ""}</div>
+      ${metaA ? `<div class="meta">${metaA}</div>` : ""}${metaB ? `<div class="meta">${metaB}</div>` : ""}
+      ${canWrite && db ? `<button type="button" class="doneBtn edit-only${j.status === "done" ? " undo" : ""}" data-done="${esc(j.id)}">${j.status === "done" ? "戻す" : "完工"}</button>` : ""}</div>
       <div class="lane">${lane}</div></div>`;
   }
   grid.innerHTML = h;
@@ -349,6 +368,8 @@ $("#form").addEventListener("submit", async e => {
   if (!v.site) { $("#ferr").textContent = "現場名を入力してください。"; return; }
   if (v.start && v.end && v.end < v.start) { $("#ferr").textContent = "完工予定日が着工日より前になっています。"; return; }
   v.amount = v.amount === "" ? null : Number(v.amount);
+  const prev = editingId ? jobs.find(x => x.id === editingId) : null;
+  v.completedAt = v.status === "done" ? ((prev && prev.completedAt) || ymd(today0())) : null;
   v.updatedAt = new Date().toISOString();
   $("#saveBtn").disabled = true;
   try {
@@ -369,12 +390,42 @@ $("#delBtn").onclick = async () => {
 
 $("#grid").addEventListener("click", e => {
   if (e.target.closest("[data-add]")) return openEditor();
+  const db2 = e.target.closest("[data-done]");
+  if (db2) return doneClick(db2);
   const r = e.target.closest(".row.job"); if (r && !document.body.classList.contains("tv")) openEditor(r.dataset.id);
 });
 $("#grid").addEventListener("keydown", e => {
+  if (e.target.closest("button")) return;
   const r = e.target.closest(".row.job"); if (r && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openEditor(r.dataset.id); }
 });
 $("#addBtn").onclick = () => openEditor();
+
+// ---- 完工ボタン（2回押しで確定、押したら一覧から消える）----
+let toastTimer = null;
+function toast(msg, undo) {
+  document.querySelector(".toast")?.remove(); clearTimeout(toastTimer);
+  const el = document.createElement("div"); el.className = "toast"; el.setAttribute("role", "status");
+  const s = document.createElement("span"); s.textContent = msg; el.appendChild(s);
+  if (undo) { const b = document.createElement("button"); b.type = "button"; b.textContent = "元に戻す"; b.onclick = () => { el.remove(); undo(); }; el.appendChild(b); }
+  document.body.appendChild(el); toastTimer = setTimeout(() => el.remove(), 8000);
+}
+async function setDone(id, done, prevStatus, prevCompleted) {
+  const data = done ? {status: "done", completedAt: ymd(today0()), updatedAt: new Date().toISOString()}
+                    : {status: prevStatus || "doing", completedAt: prevCompleted || null, updatedAt: new Date().toISOString()};
+  try { await db.collection("jobs").doc(id).update(data); return true; }
+  catch (err) { toast("保存できませんでした。通信を確認してください。"); return false; }
+}
+function doneClick(btn) {
+  const id = btn.dataset.done, j = jobs.find(x => x.id === id); if (!j || !db) return;
+  if (j.status === "done") { setDone(id, false, "doing", null).then(ok => ok && toast(`${j.site} を受注残に戻しました`)); return; }
+  if (!btn.classList.contains("armed")) {
+    btn.classList.add("armed"); btn.textContent = "完工にする";
+    setTimeout(() => { if (btn.isConnected) { btn.classList.remove("armed"); btn.textContent = "完工"; } }, 4000);
+    return;
+  }
+  const prevS = j.status, prevC = j.completedAt;
+  setDone(id, true).then(ok => ok && toast(`${j.site} を完工にしました（売上に計上）`, () => setDone(id, false, prevS, prevC)));
+}
 
 // ---- 表示切替 ----
 document.querySelectorAll("[data-w]").forEach(b => b.onclick = () => { view.range = b.dataset.w; view.offset = 0; saveView(); render(); });
