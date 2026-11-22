@@ -165,7 +165,7 @@ body.tv .frame{overflow:hidden}
   </div>
   <div class="seg" role="group" aria-label="期間移動">
     <button type="button" id="prev" aria-label="前へ">◀</button>
-    <button type="button" id="today">今日から</button>
+    <button type="button" id="today">今日へ戻る</button>
     <button type="button" id="next" aria-label="次へ">▶</button>
   </div>
   <label class="chk"><input type="checkbox" id="showDone"> 完了も表示</label>
@@ -224,7 +224,7 @@ const STATUS = {before:"着工前", doing:"施工中", hold:"保留", done:"完�
 const WD = ["日","月","火","水","木","金","土"];
 let db = null, jobs = [], loaded = false, canWrite = true, editingId = null;
 let view = {range:"1y", offset:0, showDone:false};
-const RANGE = {"4w":{n:28,w:"26px",step:7}, "3m":{n:91,w:"10px",step:30}, "1y":{n:365,w:"4px",step:91}};
+const RANGE = {"4w":{n:28,w:"26px",step:7,back:7}, "3m":{n:91,w:"10px",step:30,back:14}, "1y":{n:0,w:"4px",step:91,backM:2}};
 try { Object.assign(view, JSON.parse(localStorage.getItem("casan-gaiko-view") || "{}")); view.offset = 0; if (!RANGE[view.range]) view.range = "1y"; } catch (e) {}
 const saveView = () => { try { localStorage.setItem("casan-gaiko-view", JSON.stringify({range:view.range, showDone:view.showDone})); } catch (e) {} };
 
@@ -257,8 +257,11 @@ function renderStats() {
 function render() {
   const t = today0();
   const R = RANGE[view.range];
-  const start = new Date(t); start.setDate(start.getDate() + view.offset * R.step);
-  const N = R.n;
+  const start = new Date(t);
+  if (R.backM) start.setMonth(start.getMonth() - R.backM); else start.setDate(start.getDate() - R.back);
+  start.setDate(start.getDate() + view.offset * R.step);
+  let N = R.n;
+  if (!N) { const yEnd = new Date(t); yEnd.setFullYear(yEnd.getFullYear() + 1); N = dayDiff(new Date(t.getFullYear(), t.getMonth() - R.backM, t.getDate()), yEnd); }
   const end = new Date(start); end.setDate(end.getDate() + N - 1);
   const days = Array.from({length: N}, (_, i) => { const d = new Date(start); d.setDate(d.getDate() + i); return d; });
   const grid = $("#grid");
